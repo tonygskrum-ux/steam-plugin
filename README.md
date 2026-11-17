@@ -80,7 +80,7 @@ The same stdio snippet works in other MCP clients, including Claude Code, with t
 - `price` is `null` for free-to-play games and for games with no price set.
 - Player counts are a live snapshot, not a peak or an average.
 - Review totals count all languages and all purchase types.
-- Steam's reviews endpoint returns "No user reviews" even for appids that don't exist. Check the appid with `get_game` if a result looks empty.
+- If `get_reviews` cannot fetch a summary, the appid may not exist or may have no reviews. Confirm the appid with `get_game`.
 - Steam rate-limits its public endpoints. If you get HTTP 429, wait a minute.
 
 ## Data source and disclaimer

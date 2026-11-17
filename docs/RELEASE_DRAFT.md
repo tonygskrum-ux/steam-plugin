@@ -35,6 +35,8 @@ First public release of the Steam plugin: a zero-dependency MCP server and Curso
 - `get_reviews` — review score and positive/negative totals
 - `get_news` — latest announcements and patch notes
 
+`get_reviews` uses Steam's current public IUserReviewsService/GetAppReviews API. The older store.steampowered.com/appreviews route was retired and now redirects to the store homepage.
+
 Install from [cursor.directory/plugins/steam](https://cursor.directory/plugins/steam), or point any stdio MCP client at `node server/index.mjs` (Node 18 or newer; nothing to install).
 
 This project is not affiliated with, endorsed by, or sponsored by Valve Corporation.

@@ -10,7 +10,7 @@ Tools (MCP server `steam`, public endpoints, no API key):
 - `search_games(query)` → `[{appid, name, price}]`. Use first whenever you only have a name; pick the exact title match, and ask if ambiguous (e.g. "Hades" vs "Hades II").
 - `get_game(appid)` → store details. Prices are US store (USD); `price` is null for free or unreleased games.
 - `get_player_count(appid)` → live concurrent players (a snapshot, not a peak).
-- `get_reviews(appid)` → all-language review summary. A nonexistent appid also returns "No user reviews", so confirm the appid with `get_game` if results look empty.
+- `get_reviews(appid)` → all-language, all-purchase-type review summary. If the tool errors, confirm the appid with `get_game`.
 - `get_news(appid, count≤10)` → recent announcements with ISO dates and short excerpts.
 
 Rules:

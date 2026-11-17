@@ -65,10 +65,16 @@ async function getPlayerCount(a) {
 
 async function getReviews(a) {
   const id = appidArg(a);
-  const j = await getJson(`https://store.steampowered.com/appreviews/${id}?json=1&language=all&purchase_type=all&num_per_page=0`);
-  const s = j?.query_summary;
-  if (j?.success !== 1 || !s) throw new ToolError(`Could not fetch reviews for appid ${id}.`);
-  // Note: Steam returns success with zeros ("No user reviews") for nonexistent appids too.
+  // store.steampowered.com/appreviews was retired (it now 302s to the store homepage).
+  // Official public replacement; no API key. purchase_type 1 = all, review_type 0 = all
+  // (score totals are only returned when review_type is all).
+  const input = encodeURIComponent(JSON.stringify({
+    appid: id, num_per_page: 1, languages: ["all"],
+    purchase_type: 1, review_type: 0, display_language: "english",
+  }));
+  const j = await getJson(`https://api.steampowered.com/IUserReviewsService/GetAppReviews/v1/?input_json=${input}`);
+  const s = j?.response?.query_summary;
+  if (!s) throw new ToolError(`Could not fetch reviews for appid ${id}${j?.__status ? ` (Steam HTTP ${j.__status})` : ""}.`);
   return { appid: id, scoreDescription: s.review_score_desc, totalPositive: s.total_positive,
     totalNegative: s.total_negative, totalReviews: s.total_reviews };
 }
