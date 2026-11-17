@@ -1,12 +1,18 @@
-# Steam plugin for Cursor
+# Steam plugin
 
-Ask your Cursor agent about any Steam game: store details and price, how many people are playing right now, its review score, and its latest news. Includes an MCP server and a skill that tells the agent when to use it.
+Look up any Steam game from your editor: US store price, live player count, review score, and latest news. No API key.
 
-- **No API key needed.** It only calls Steam's public, unauthenticated endpoints.
-- **No dependencies.** One Node.js file (Node 18 or newer); nothing to `npm install`.
-- **Read-only.** It never signs in to Steam or changes anything.
+[![Listed on cursor.directory](https://img.shields.io/badge/cursor.directory-steam-0C7A46)](https://cursor.directory/plugins/steam)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![MCP](https://img.shields.io/badge/MCP-stdio-555)](https://modelcontextprotocol.io)
 
-## Tools
+A zero-dependency Node.js MCP server (Node 18 or newer) plus a Cursor skill. It only calls Steam's public, unauthenticated endpoints, and it is read-only.
+
+Built by [Hollow Wick Games](https://hollowwickgames.com) while making Last Light: Waxmourn.
+
+![Looking up Steam games through the MCP server](docs/demo.gif)
+
+## What it does
 
 | Tool | Arguments | Returns |
 |---|---|---|
@@ -16,19 +22,57 @@ Ask your Cursor agent about any Steam game: store details and price, how many pe
 | `get_reviews` | `appid` | `{ appid, scoreDescription, totalPositive, totalNegative, totalReviews }` |
 | `get_news` | `appid`, `count` (1–10, default 5) | `[{ title, url, author, date (ISO 8601), excerpt }]` |
 
-Example prompts: *"How many people are playing Counter-Strike 2 right now?"*, *"What's Hades' review score and price?"*, *"Show the latest news for appid 1145360."*
+## Example prompts
+
+- How many people are playing Counter-Strike 2 right now?
+- What's Hades' review score and price?
+- Show the latest news for appid 1145360.
 
 ## Install in Cursor
 
-Clone this repo, then link it into Cursor's local plugins folder:
+The easiest path is the listing on [cursor.directory](https://cursor.directory/plugins/steam).
 
-```bash
-git clone <repo-url> steam-plugin
-mkdir -p ~/.cursor/plugins/local
-ln -s "$(pwd)/steam-plugin" ~/.cursor/plugins/local/steam   # or copy the folder there
+To add the server by hand, clone this repo and put the following in Cursor's MCP config (`~/.cursor/mcp.json`), using your real path:
+
+```json
+{
+  "mcpServers": {
+    "steam": {
+      "command": "node",
+      "args": ["/absolute/path/to/steam-plugin/server/index.mjs"]
+    }
+  }
+}
 ```
 
-Reload the Cursor window. The `steam` MCP server and skill then appear under the plugin.
+Requires Node.js 18 or newer. There is nothing to `npm install`.
+
+Or install it as a local Cursor plugin (MCP server plus the bundled skill):
+
+```bash
+git clone https://github.com/tonygskrum-ux/steam-plugin.git
+mkdir -p ~/.cursor/plugins/local
+ln -s "$(pwd)/steam-plugin" ~/.cursor/plugins/local/steam
+```
+
+Reload Cursor afterward.
+
+## Other MCP clients
+
+The server speaks MCP over stdio. Point any client at `node /absolute/path/to/steam-plugin/server/index.mjs`. For Claude Desktop, add this to `claude_desktop_config.json` (macOS: `~/Library/Application Support/Claude/`; Windows: `%APPDATA%\Claude\`):
+
+```json
+{
+  "mcpServers": {
+    "steam": {
+      "command": "node",
+      "args": ["/absolute/path/to/steam-plugin/server/index.mjs"]
+    }
+  }
+}
+```
+
+The same stdio snippet works in other MCP clients, including Claude Code, with their own config paths.
 
 ## Notes and limits
 
