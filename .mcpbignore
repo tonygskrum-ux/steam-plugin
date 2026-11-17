@@ -1,0 +1,12 @@
+.git/
+.cursor-plugin/
+docs/
+skills/
+PROOF.md
+SUBMISSION.md
+server.json
+glama.json
+Dockerfile
+plugin.json
+mcp.json
+*.mcpb

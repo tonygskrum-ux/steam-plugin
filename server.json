@@ -1,0 +1,23 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.tonygskrum-ux/steam-plugin",
+  "title": "Steam plugin",
+  "description": "Look up Steam games: US price, live player count, review score, and latest news. No API key needed.",
+  "repository": {
+    "url": "https://github.com/tonygskrum-ux/steam-plugin",
+    "source": "github"
+  },
+  "websiteUrl": "https://cursor.directory/plugins/steam",
+  "version": "0.1.0",
+  "packages": [
+    {
+      "registryType": "mcpb",
+      "identifier": "https://github.com/tonygskrum-ux/steam-plugin/releases/download/v0.1.0/steam-plugin.mcpb",
+      "fileSha256": "7e2ce0bdac31a79662d0a1f08855f53f1f262a267004e1834929994412d86d35",
+      "version": "0.1.0",
+      "transport": {
+        "type": "stdio"
+      }
+    }
+  ]
+}
