@@ -20,7 +20,7 @@ Built by [Hollow Wick Games](https://hollowwickgames.com) while making Last Ligh
 | `get_game` | `appid` | `{ appid, name, type, isFree, price{final, initial, discountPercent, currency, formatted}, releaseDate{comingSoon, date}, developers, publishers, genres, platforms, shortDescription, storeUrl }` |
 | `get_player_count` | `appid` | `{ appid, currentPlayers }` |
 | `get_reviews` | `appid` | `{ appid, scoreDescription, totalPositive, totalNegative, totalReviews }` |
-| `get_news` | `appid`, `count` (1–10, default 5) | `[{ title, url, author, date (ISO 8601), excerpt }]` |
+| `get_news` | `appid`, `count` (1–10, default 5) | `[{ title, url, author, date (ISO 8601, or null if Steam gives none), excerpt }]` |
 
 ## Example prompts
 
@@ -82,6 +82,15 @@ The same stdio snippet works in other MCP clients, including Claude Code, with t
 - Review totals count all languages and all purchase types.
 - If `get_reviews` cannot fetch a summary, the appid may not exist or may have no reviews. Confirm the appid with `get_game`.
 - Steam rate-limits its public endpoints. If you get HTTP 429, wait a minute.
+- The server implements the handshake-based MCP protocol versions `2025-11-25`, `2025-06-18` and `2024-11-05`. It does not implement `2025-03-26`, which requires JSON-RPC batch support, so a client that offers only that version is offered `2025-11-25` instead. It does not implement the stateless `2026-07-28` revision either; clients that speak both it and a handshake version fall back to the handshake.
+
+## Tests
+
+```bash
+node --test
+```
+
+The tests stub `fetch`, so they never call Steam and need nothing installed.
 
 ## Data source and disclaimer
 

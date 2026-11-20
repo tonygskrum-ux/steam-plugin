@@ -2,6 +2,7 @@
 .cursor-plugin/
 docs/
 skills/
+test/
 PROOF.md
 SUBMISSION.md
 server.json
