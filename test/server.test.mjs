@@ -3,6 +3,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { createInterface } from "node:readline";
 
 // Runs in the child before the server loads. MOCK_FETCH is a JSON list of { match, status, body };
@@ -167,4 +168,17 @@ test("get_news keeps every item when one has no usable date", { timeout: 10000 }
   assert.deepEqual(results(await server.ask(call("get_news", { appid: 620 }))).map((n) => [n.title, n.date]), [
     ["dated", "2023-11-14T22:13:20.000Z"], ["undated", null], ["zero", null], ["garbage", null], ["huge", null],
   ]);
+});
+
+// A release bumps the version in every one of these. This fails if one was missed.
+test("the server, the manifests and the registry entry agree on the version", { timeout: 10000 }, async (t) => {
+  const json = (path) => JSON.parse(readFileSync(new URL(`../${path}`, import.meta.url), "utf8"));
+  const server = start(t);
+  const { version } = (await server.ask({ jsonrpc: "2.0", id: 1, method: "initialize" })).result.serverInfo;
+  assert.match(version, /^\d+\.\d+\.\d+$/);
+  for (const path of ["plugin.json", ".cursor-plugin/plugin.json", "manifest.json", "server.json"]) assert.equal(json(path).version, version, path);
+  const [bundle] = json("server.json").packages;
+  assert.equal(bundle.version, version, "server.json package version");
+  assert.match(bundle.identifier, new RegExp(`/releases/download/v${version.replaceAll(".", "\\.")}/steam-plugin\\.mcpb$`));
+  assert.match(bundle.fileSha256, /^[0-9a-f]{64}$/);
 });

@@ -3,7 +3,7 @@
   "manifest_version": "0.4",
   "name": "steam-plugin",
   "display_name": "Steam plugin",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Look up any Steam game from your editor: US store price, live player count, review score, and latest news. No API key.",
   "long_description": "A zero-dependency Node.js MCP server (Node 18 or newer) that calls Steam's public, unauthenticated endpoints. Tools: search_games, get_game, get_player_count, get_reviews, and get_news. Prices are from the US store. Not affiliated with, endorsed by, or sponsored by Valve Corporation.",
   "author": {
