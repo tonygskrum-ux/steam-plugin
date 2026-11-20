@@ -31,7 +31,9 @@ async function searchGames(a) {
   const q = String(a?.query ?? "").trim();
   if (!q) throw new ToolError("query is required.");
   const j = await getJson(`https://store.steampowered.com/api/storesearch/?term=${encodeURIComponent(q)}&cc=us&l=en`);
-  return (j.items ?? []).map((i) => ({
+  // No matches is HTTP 200 with items: []. Anything else is a failure and must not look like an empty result.
+  if (!Array.isArray(j?.items)) throw new ToolError(`Steam search failed (${j?.__status ? `HTTP ${j.__status}` : "unexpected response"}). This is a Steam error, not an empty result; retry later.`);
+  return j.items.map((i) => ({
     appid: i.id, name: i.name,
     price: i.price ? { final: i.price.final / 100, initial: i.price.initial / 100, currency: i.price.currency } : null,
   }));
@@ -40,6 +42,8 @@ async function searchGames(a) {
 async function getGame(a) {
   const id = appidArg(a);
   const j = await getJson(`https://store.steampowered.com/api/appdetails?appids=${id}&cc=us&l=en`);
+  // An unknown appid is HTTP 200 with success: false, so a non-2xx here is always Steam failing.
+  if (j?.__status) throw new ToolError(`Steam store request failed for appid ${id} (HTTP ${j.__status}). This is a Steam error, not an unknown appid; retry later.`);
   const e = j?.[id];
   if (!e?.success || !e.data) throw new ToolError(`Unknown appid ${id}: Steam store has no details for it (or it is region-locked/unlisted).`);
   const d = e.data;
@@ -79,6 +83,12 @@ async function getReviews(a) {
     totalNegative: s.total_negative, totalReviews: s.total_reviews };
 }
 
+// Steam dates are Unix seconds. One that is missing or unusable becomes null instead of throwing.
+function isoDate(sec) {
+  const d = new Date(Number.isFinite(sec) && sec > 0 ? sec * 1000 : NaN);
+  return Number.isNaN(d.getTime()) ? null : d.toISOString();
+}
+
 async function getNews(a) {
   const id = appidArg(a);
   const count = Math.min(10, Math.max(1, Number.isInteger(Number(a?.count)) ? Number(a.count) : 5));
@@ -86,7 +96,7 @@ async function getNews(a) {
   if (!j?.appnews) throw new ToolError(`No news for appid ${id} (Steam HTTP ${j?.__status ?? "?"}; unknown appid).`);
   return (j.appnews.newsitems ?? []).map((n) => ({
     title: n.title, url: n.url, author: n.author || null,
-    date: new Date(n.date * 1000).toISOString(), excerpt: n.contents,
+    date: isoDate(n.date), excerpt: n.contents,
   }));
 }
 
@@ -139,5 +149,8 @@ createInterface({ input: process.stdin }).on("line", (line) => {
   if (!line.trim()) return;
   let msg;
   try { msg = JSON.parse(line); } catch { return err(null, -32700, "Parse error"); }
+  // Only a JSON object can be a message. Reject anything else here: handle() and the catch below
+  // both read properties of msg, which throws on null and would take the process down.
+  if (msg === null || typeof msg !== "object" || Array.isArray(msg)) return err(null, -32600, "Invalid Request");
   handle(msg).catch((e) => err(msg.id ?? null, -32603, e.message));
 });
