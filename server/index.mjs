@@ -3,7 +3,9 @@
 import { createInterface } from "node:readline";
 
 const UA = { "User-Agent": "steam-agent-plugin/0.1.0" };
-const PROTOCOL = "2025-06-18";
+// Handshake-era MCP revisions this server implements, newest first. `initialize` echoes a requested
+// version only if it is listed here and otherwise answers with the newest.
+const PROTOCOLS = ["2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05"];
 
 class ToolError extends Error {}
 
@@ -12,6 +14,9 @@ async function getJson(url) {
   try { res = await fetch(url, { headers: UA, signal: AbortSignal.timeout(15000) }); }
   catch (e) { throw new ToolError(`Network error contacting Steam: ${e.message}`); }
   if (res.status === 429) throw new ToolError("Steam rate limit hit (HTTP 429). Wait a minute and retry.");
+  // A 5xx is Steam failing, never "not found". Other non-2xx statuses go back to the caller,
+  // because some endpoints answer an unknown appid with 403 or 404.
+  if (res.status >= 500) throw new ToolError(`Steam server error (HTTP ${res.status}). The problem is on Steam's side; retry later.`);
   if (!res.ok) return { __status: res.status };
   try { return await res.json(); } catch { throw new ToolError(`Steam returned non-JSON (HTTP ${res.status}).`); }
 }
@@ -63,7 +68,7 @@ async function getPlayerCount(a) {
   const id = appidArg(a);
   const j = await getJson(`https://api.steampowered.com/ISteamUserStats/GetNumberOfCurrentPlayers/v1/?appid=${id}`);
   const r = j?.response;
-  if (r?.result !== 1) throw new ToolError(`No player count for appid ${id} (Steam result=${r?.result ?? `HTTP ${j?.__status}`}; unknown appid or not a game).`);
+  if (r?.result !== 1) throw new ToolError(`No player count for appid ${id} (Steam ${j?.__status ? `HTTP ${j.__status}` : `result=${r?.result ?? "missing"}`}; unknown appid or not a game).`);
   return { appid: id, currentPlayers: r.player_count };
 }
 
@@ -91,7 +96,8 @@ function isoDate(sec) {
 
 async function getNews(a) {
   const id = appidArg(a);
-  const count = Math.min(10, Math.max(1, Number.isInteger(Number(a?.count)) ? Number(a.count) : 5));
+  const asked = Number(a?.count ?? 5); // an explicit null means "not given", like leaving it out
+  const count = Number.isInteger(asked) ? Math.min(10, Math.max(1, asked)) : 5;
   const j = await getJson(`https://api.steampowered.com/ISteamNews/GetNewsForApp/v2/?appid=${id}&count=${count}&maxlength=300&format=json`);
   if (!j?.appnews) throw new ToolError(`No news for appid ${id} (Steam HTTP ${j?.__status ?? "?"}; unknown appid).`);
   return (j.appnews.newsitems ?? []).map((n) => ({
@@ -120,12 +126,11 @@ const err = (id, code, message) => send({ jsonrpc: "2.0", id, error: { code, mes
 
 async function handle(msg) {
   const { id, method, params } = msg;
-  const isReq = id !== undefined && id !== null;
+  if (id === undefined || id === null) return; // No id means a notification, and those are never answered.
   switch (method) {
     case "initialize":
-      return ok(id, { protocolVersion: params?.protocolVersion || PROTOCOL, capabilities: { tools: {} },
-        serverInfo: { name: "steam", version: "0.1.0" } });
-    case "notifications/initialized": case "notifications/cancelled": return;
+      return ok(id, { protocolVersion: PROTOCOLS.includes(params?.protocolVersion) ? params.protocolVersion : PROTOCOLS[0],
+        capabilities: { tools: {} }, serverInfo: { name: "steam", version: "0.1.0" } });
     case "ping": return ok(id, {});
     case "tools/list":
       return ok(id, { tools: TOOLS.map(({ name, description, inputSchema }) => ({ name, description, inputSchema })) });
@@ -141,7 +146,7 @@ async function handle(msg) {
       }
     }
     default:
-      if (isReq) return err(id, -32601, `Method not found: ${method}`);
+      return err(id, -32601, `Method not found: ${method}`);
   }
 }
 
