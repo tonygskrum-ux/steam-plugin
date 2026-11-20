@@ -2,7 +2,8 @@
 // Zero-dependency stdio MCP server for public Steam endpoints (no API key).
 import { createInterface } from "node:readline";
 
-const UA = { "User-Agent": "steam-agent-plugin/0.1.0" };
+const VERSION = "0.1.1";
+const UA = { "User-Agent": `steam-agent-plugin/${VERSION}` };
 // Handshake-era MCP revisions this server implements, newest first. `initialize` echoes a requested
 // version only if it is listed here and otherwise answers with the newest. 2025-03-26 is left out
 // on purpose: it obliges servers to accept JSON-RPC batches, which this server does not.
@@ -131,7 +132,7 @@ async function handle(msg) {
   switch (method) {
     case "initialize":
       return ok(id, { protocolVersion: PROTOCOLS.includes(params?.protocolVersion) ? params.protocolVersion : PROTOCOLS[0],
-        capabilities: { tools: {} }, serverInfo: { name: "steam", version: "0.1.0" } });
+        capabilities: { tools: {} }, serverInfo: { name: "steam", version: VERSION } });
     case "ping": return ok(id, {});
     case "tools/list":
       return ok(id, { tools: TOOLS.map(({ name, description, inputSchema }) => ({ name, description, inputSchema })) });
