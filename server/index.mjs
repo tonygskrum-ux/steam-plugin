@@ -3,7 +3,11 @@
 import { createInterface } from "node:readline";
 
 const UA = { "User-Agent": "steam-agent-plugin/0.1.0" };
-const PROTOCOL = "2025-06-18";
+// MCP revisions this server implements, newest first. `initialize` echoes the client's version only
+// if it is listed here, and otherwise answers with the newest. Left out on purpose:
+// - 2025-03-26 obliges servers to accept JSON-RPC batches, which this server does not.
+// - 2026-07-28 and later drop the `initialize` handshake (per-request `_meta`, `server/discover`).
+const PROTOCOLS = ["2025-11-25", "2025-06-18", "2024-11-05"];
 
 class ToolError extends Error {}
 
@@ -110,11 +114,15 @@ const err = (id, code, message) => send({ jsonrpc: "2.0", id, error: { code, mes
 
 async function handle(msg) {
   const { id, method, params } = msg;
-  const isReq = id !== undefined && id !== null;
+  // No id (or a null one, which MCP forbids) means a notification, and a notification must never be
+  // answered, whatever its method. None of them needs any work from this server, so they all stop here.
+  if (id === undefined || id === null) return;
   switch (method) {
-    case "initialize":
-      return ok(id, { protocolVersion: params?.protocolVersion || PROTOCOL, capabilities: { tools: {} },
+    case "initialize": {
+      const requested = params?.protocolVersion;
+      return ok(id, { protocolVersion: PROTOCOLS.includes(requested) ? requested : PROTOCOLS[0], capabilities: { tools: {} },
         serverInfo: { name: "steam", version: "0.1.0" } });
+    }
     case "notifications/initialized": case "notifications/cancelled": return;
     case "ping": return ok(id, {});
     case "tools/list":
@@ -131,7 +139,7 @@ async function handle(msg) {
       }
     }
     default:
-      if (isReq) return err(id, -32601, `Method not found: ${method}`);
+      return err(id, -32601, `Method not found: ${method}`);
   }
 }
 
