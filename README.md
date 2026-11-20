@@ -82,7 +82,7 @@ The same stdio snippet works in other MCP clients, including Claude Code, with t
 - Review totals count all languages and all purchase types.
 - If `get_reviews` cannot fetch a summary, the appid may not exist or may have no reviews. Confirm the appid with `get_game`.
 - Steam rate-limits its public endpoints. If you get HTTP 429, wait a minute.
-- The server implements the handshake-based MCP protocol versions `2024-11-05` through `2025-11-25`. It does not implement the stateless `2026-07-28` revision; clients that speak both fall back to the handshake.
+- The server implements the handshake-based MCP protocol versions `2025-11-25`, `2025-06-18` and `2024-11-05`. It does not implement `2025-03-26`, which requires JSON-RPC batch support, so a client that offers only that version is offered `2025-11-25` instead. It does not implement the stateless `2026-07-28` revision either; clients that speak both it and a handshake version fall back to the handshake.
 
 ## Tests
 

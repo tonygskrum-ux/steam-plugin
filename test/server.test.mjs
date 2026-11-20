@@ -74,8 +74,9 @@ test("initialize echoes a supported protocol version and answers any other with 
     const params = { protocolVersion, capabilities: {}, clientInfo: { name: "test", version: "0" } };
     return (await server.ask({ jsonrpc: "2.0", id: 1, method: "initialize", params })).result.protocolVersion;
   };
-  for (const version of ["2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05"]) assert.equal(await negotiated(version), version);
-  for (const version of ["2026-07-28", "1999-01-01", undefined, 5]) assert.equal(await negotiated(version), "2025-11-25");
+  for (const version of ["2025-11-25", "2025-06-18", "2024-11-05"]) assert.equal(await negotiated(version), version);
+  // 2025-03-26 requires JSON-RPC batch support, which the server lacks, so it is not echoed either.
+  for (const version of ["2026-07-28", "2025-03-26", "1999-01-01", undefined, 5]) assert.equal(await negotiated(version), "2025-11-25");
 });
 
 // Clients that also speak the stateless 2026-07-28 revision probe with server/discover and fall

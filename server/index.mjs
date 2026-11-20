@@ -4,8 +4,9 @@ import { createInterface } from "node:readline";
 
 const UA = { "User-Agent": "steam-agent-plugin/0.1.0" };
 // Handshake-era MCP revisions this server implements, newest first. `initialize` echoes a requested
-// version only if it is listed here and otherwise answers with the newest.
-const PROTOCOLS = ["2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05"];
+// version only if it is listed here and otherwise answers with the newest. 2025-03-26 is left out
+// on purpose: it obliges servers to accept JSON-RPC batches, which this server does not.
+const PROTOCOLS = ["2025-11-25", "2025-06-18", "2024-11-05"];
 
 class ToolError extends Error {}
 
