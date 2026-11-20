@@ -3,7 +3,9 @@
 import { createInterface } from "node:readline";
 
 const UA = { "User-Agent": "steam-agent-plugin/0.1.0" };
-const PROTOCOL = "2025-06-18";
+// Handshake-era MCP revisions this server implements, newest first. `initialize` echoes a requested
+// version only if it is listed here and otherwise answers with the newest.
+const PROTOCOLS = ["2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05"];
 
 class ToolError extends Error {}
 
@@ -12,6 +14,9 @@ async function getJson(url) {
   try { res = await fetch(url, { headers: UA, signal: AbortSignal.timeout(15000) }); }
   catch (e) { throw new ToolError(`Network error contacting Steam: ${e.message}`); }
   if (res.status === 429) throw new ToolError("Steam rate limit hit (HTTP 429). Wait a minute and retry.");
+  // A 5xx is Steam failing, never "not found". Other non-2xx statuses go back to the caller,
+  // because some endpoints answer an unknown appid with 403 or 404.
+  if (res.status >= 500) throw new ToolError(`Steam server error (HTTP ${res.status}). The problem is on Steam's side; retry later.`);
   if (!res.ok) return { __status: res.status };
   try { return await res.json(); } catch { throw new ToolError(`Steam returned non-JSON (HTTP ${res.status}).`); }
 }
@@ -31,7 +36,9 @@ async function searchGames(a) {
   const q = String(a?.query ?? "").trim();
   if (!q) throw new ToolError("query is required.");
   const j = await getJson(`https://store.steampowered.com/api/storesearch/?term=${encodeURIComponent(q)}&cc=us&l=en`);
-  return (j.items ?? []).map((i) => ({
+  // No matches is HTTP 200 with items: []. Anything else is a failure and must not look like an empty result.
+  if (!Array.isArray(j?.items)) throw new ToolError(`Steam search failed (${j?.__status ? `HTTP ${j.__status}` : "unexpected response"}). This is a Steam error, not an empty result; retry later.`);
+  return j.items.map((i) => ({
     appid: i.id, name: i.name,
     price: i.price ? { final: i.price.final / 100, initial: i.price.initial / 100, currency: i.price.currency } : null,
   }));
@@ -40,6 +47,8 @@ async function searchGames(a) {
 async function getGame(a) {
   const id = appidArg(a);
   const j = await getJson(`https://store.steampowered.com/api/appdetails?appids=${id}&cc=us&l=en`);
+  // An unknown appid is HTTP 200 with success: false, so a non-2xx here is always Steam failing.
+  if (j?.__status) throw new ToolError(`Steam store request failed for appid ${id} (HTTP ${j.__status}). This is a Steam error, not an unknown appid; retry later.`);
   const e = j?.[id];
   if (!e?.success || !e.data) throw new ToolError(`Unknown appid ${id}: Steam store has no details for it (or it is region-locked/unlisted).`);
   const d = e.data;
@@ -59,7 +68,7 @@ async function getPlayerCount(a) {
   const id = appidArg(a);
   const j = await getJson(`https://api.steampowered.com/ISteamUserStats/GetNumberOfCurrentPlayers/v1/?appid=${id}`);
   const r = j?.response;
-  if (r?.result !== 1) throw new ToolError(`No player count for appid ${id} (Steam result=${r?.result ?? `HTTP ${j?.__status}`}; unknown appid or not a game).`);
+  if (r?.result !== 1) throw new ToolError(`No player count for appid ${id} (Steam ${j?.__status ? `HTTP ${j.__status}` : `result=${r?.result ?? "missing"}`}; unknown appid or not a game).`);
   return { appid: id, currentPlayers: r.player_count };
 }
 
@@ -79,14 +88,21 @@ async function getReviews(a) {
     totalNegative: s.total_negative, totalReviews: s.total_reviews };
 }
 
+// Steam dates are Unix seconds. One that is missing or unusable becomes null instead of throwing.
+function isoDate(sec) {
+  const d = new Date(Number.isFinite(sec) && sec > 0 ? sec * 1000 : NaN);
+  return Number.isNaN(d.getTime()) ? null : d.toISOString();
+}
+
 async function getNews(a) {
   const id = appidArg(a);
-  const count = Math.min(10, Math.max(1, Number.isInteger(Number(a?.count)) ? Number(a.count) : 5));
+  const asked = Number(a?.count ?? 5); // an explicit null means "not given", like leaving it out
+  const count = Number.isInteger(asked) ? Math.min(10, Math.max(1, asked)) : 5;
   const j = await getJson(`https://api.steampowered.com/ISteamNews/GetNewsForApp/v2/?appid=${id}&count=${count}&maxlength=300&format=json`);
   if (!j?.appnews) throw new ToolError(`No news for appid ${id} (Steam HTTP ${j?.__status ?? "?"}; unknown appid).`);
   return (j.appnews.newsitems ?? []).map((n) => ({
     title: n.title, url: n.url, author: n.author || null,
-    date: new Date(n.date * 1000).toISOString(), excerpt: n.contents,
+    date: isoDate(n.date), excerpt: n.contents,
   }));
 }
 
@@ -110,12 +126,11 @@ const err = (id, code, message) => send({ jsonrpc: "2.0", id, error: { code, mes
 
 async function handle(msg) {
   const { id, method, params } = msg;
-  const isReq = id !== undefined && id !== null;
+  if (id === undefined || id === null) return; // No id means a notification, and those are never answered.
   switch (method) {
     case "initialize":
-      return ok(id, { protocolVersion: params?.protocolVersion || PROTOCOL, capabilities: { tools: {} },
-        serverInfo: { name: "steam", version: "0.1.0" } });
-    case "notifications/initialized": case "notifications/cancelled": return;
+      return ok(id, { protocolVersion: PROTOCOLS.includes(params?.protocolVersion) ? params.protocolVersion : PROTOCOLS[0],
+        capabilities: { tools: {} }, serverInfo: { name: "steam", version: "0.1.0" } });
     case "ping": return ok(id, {});
     case "tools/list":
       return ok(id, { tools: TOOLS.map(({ name, description, inputSchema }) => ({ name, description, inputSchema })) });
@@ -131,7 +146,7 @@ async function handle(msg) {
       }
     }
     default:
-      if (isReq) return err(id, -32601, `Method not found: ${method}`);
+      return err(id, -32601, `Method not found: ${method}`);
   }
 }
 
@@ -139,5 +154,8 @@ createInterface({ input: process.stdin }).on("line", (line) => {
   if (!line.trim()) return;
   let msg;
   try { msg = JSON.parse(line); } catch { return err(null, -32700, "Parse error"); }
+  // Only a JSON object can be a message. Reject anything else here: handle() and the catch below
+  // both read properties of msg, which throws on null and would take the process down.
+  if (msg === null || typeof msg !== "object" || Array.isArray(msg)) return err(null, -32600, "Invalid Request");
   handle(msg).catch((e) => err(msg.id ?? null, -32603, e.message));
 });
